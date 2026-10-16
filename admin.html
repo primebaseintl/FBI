@@ -50,6 +50,11 @@ function fill(d, m) {
 
 const convos = {};
 const unread = new Set();
+let lastId = 0;
+async function poll() {
+  const { data } = await db.from("messages").select("*").gt("id", lastId).order("id");
+  (data || []).forEach(addMsg);
+}
 let current = null;
 
 function renderList() {
@@ -75,6 +80,7 @@ function renderMsgs() {
 }
 
 function addMsg(m) {
+  if (m.id > lastId) lastId = m.id;
   const list = convos[m.session_id] = convos[m.session_id] || [];
   if (list.some(x => x.id === m.id)) return;
   list.push(m);
@@ -89,6 +95,7 @@ function addMsg(m) {
   db.channel("admin")
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, p => addMsg(p.new))
     .subscribe();
+  setInterval(poll, 3000);
 })();
 
 $("f").onsubmit = async e => {
