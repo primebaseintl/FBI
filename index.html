@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Welcome to MYF Contact Center</title>
+<title>Welcome to FBI Contact Center</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0}
@@ -19,21 +19,23 @@ header{padding:14px 16px;background:#181b22;font-weight:400}
 .m.me{align-self:flex-end;background:#4f8cff}
 form{display:flex;gap:8px;padding:12px;background:#181b22}
 input{flex:1;padding:12px;border-radius:10px;border:0;background:#252a35;color:#fff;font-size:1rem}
+.m img{max-width:100%;border-radius:8px;display:block;margin-top:4px}
+#att{background:#252a35;padding:12px 14px}
 </style>
 </head>
 <body>
 <div id="welcome" class="screen active">
-  <h1>Welcome to MYF Contact Center</h1>
+  <h1>Welcome to FBI Contact Center</h1>
   <button id="proceed">Proceed</button>
 </div>
 <div id="chat" class="screen">
-  <header>MYF Contact Center</header>
+  <header>FBI Contact Center</header>
   <div id="msgs"></div>
-  <form id="f"><input id="t" placeholder="Type a message..." autocomplete="off"><button>Send</button></form>
+  <form id="f"><button type="button" id="att" title="Send photo">&#128206;</button><input id="file" type="file" accept="image/*" hidden><input id="t" placeholder="Type a message..." autocomplete="off"><button>Send</button></form>
 </div>
 <script>
-const SUPABASE_URL = "YOUR_SUPABASE_URL";
-const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+const SUPABASE_URL = "https://znugrmhvwzszkhdxcdeh.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_h_4EPwruDzmwGoKwWfBNVA_kOa1-S-Y";
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let sid;
@@ -44,6 +46,20 @@ if (!sid) {
 }
 
 const $ = id => document.getElementById(id);
+async function sendImage(file, sender, session) {
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+  const path = session + "/" + Date.now() + "." + ext;
+  const up = await db.storage.from("chat-images").upload(path, file, { contentType: file.type });
+  if (up.error) { alert("Upload failed: " + up.error.message); return; }
+  const url = db.storage.from("chat-images").getPublicUrl(path).data.publicUrl;
+  const { error } = await db.from("messages").insert({ session_id: session, sender, body: "", image_url: url });
+  if (error) alert("Could not send: " + error.message);
+}
+function fill(d, m) {
+  if (m.body) d.appendChild(document.createTextNode(m.body));
+  if (m.image_url) { const i = document.createElement("img"); i.src = m.image_url; d.appendChild(i); }
+}
+
 const seen = new Set();
 
 function add(m) {
@@ -51,7 +67,7 @@ function add(m) {
   seen.add(m.id);
   const d = document.createElement("div");
   d.className = "m" + (m.sender === "user" ? " me" : "");
-  d.textContent = m.body;
+  fill(d, m);
   $("msgs").appendChild(d);
   $("msgs").scrollTop = $("msgs").scrollHeight;
 }
@@ -74,6 +90,8 @@ $("f").onsubmit = async e => {
   const { error } = await db.from("messages").insert({ session_id: sid, sender: "user", body });
   if (error) alert("Could not send: " + error.message);
 };
+$("att").onclick = () => $("file").click();
+$("file").onchange = async e => { const f = e.target.files[0]; e.target.value = ""; if (f) await sendImage(f, "user", sid); };
 </script>
 </body>
 </html>
