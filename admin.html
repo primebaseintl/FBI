@@ -19,19 +19,35 @@ header{padding:14px 16px;background:#181b22;font-weight:400}
 form{display:flex;gap:8px;padding:12px;background:#181b22}
 input{flex:1;padding:12px;border-radius:10px;border:0;background:#252a35;color:#fff;font-size:1rem}
 button{background:#4f8cff;color:#fff;border:0;border-radius:10px;padding:12px 24px;font-size:1rem}
+.m img{max-width:100%;border-radius:8px;display:block;margin-top:4px}
+#att{background:#252a35;padding:12px 14px}
 </style>
 </head>
 <body>
-<header>MYF Contact Center – Admin</header>
+<header>FBI Contact Center – Admin</header>
 <div id="list"></div>
 <div id="msgs"><div class="m">Select a conversation above.</div></div>
-<form id="f"><input id="t" placeholder="Reply..." autocomplete="off"><button>Send</button></form>
+<form id="f"><button type="button" id="att" title="Send photo">&#128206;</button><input id="file" type="file" accept="image/*" hidden><input id="t" placeholder="Reply..." autocomplete="off"><button>Send</button></form>
 <script>
-const SUPABASE_URL = "YOUR_SUPABASE_URL";
-const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+const SUPABASE_URL = "https://znugrmhvwzszkhdxcdeh.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_h_4EPwruDzmwGoKwWfBNVA_kOa1-S-Y";
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const $ = id => document.getElementById(id);
+async function sendImage(file, sender, session) {
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+  const path = session + "/" + Date.now() + "." + ext;
+  const up = await db.storage.from("chat-images").upload(path, file, { contentType: file.type });
+  if (up.error) { alert("Upload failed: " + up.error.message); return; }
+  const url = db.storage.from("chat-images").getPublicUrl(path).data.publicUrl;
+  const { error } = await db.from("messages").insert({ session_id: session, sender, body: "", image_url: url });
+  if (error) alert("Could not send: " + error.message);
+}
+function fill(d, m) {
+  if (m.body) d.appendChild(document.createTextNode(m.body));
+  if (m.image_url) { const i = document.createElement("img"); i.src = m.image_url; d.appendChild(i); }
+}
+
 const convos = {};
 const unread = new Set();
 let current = null;
@@ -52,7 +68,7 @@ function renderMsgs() {
   (convos[current] || []).forEach(m => {
     const d = document.createElement("div");
     d.className = "m" + (m.sender === "admin" ? " me" : "");
-    d.textContent = m.body;
+    fill(d, m);
     $("msgs").appendChild(d);
   });
   $("msgs").scrollTop = $("msgs").scrollHeight;
@@ -83,6 +99,8 @@ $("f").onsubmit = async e => {
   const { error } = await db.from("messages").insert({ session_id: current, sender: "admin", body });
   if (error) alert("Could not send: " + error.message);
 };
+$("att").onclick = () => { if (current) $("file").click(); };
+$("file").onchange = async e => { const f = e.target.files[0]; e.target.value = ""; if (f && current) await sendImage(f, "admin", current); };
 </script>
 </body>
 </html>
