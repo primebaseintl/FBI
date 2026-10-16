@@ -61,8 +61,14 @@ function fill(d, m) {
 }
 
 const seen = new Set();
+let lastId = 0;
+async function poll() {
+  const { data } = await db.from("messages").select("*").eq("session_id", sid).gt("id", lastId).order("id");
+  (data || []).forEach(add);
+}
 
 function add(m) {
+  if (m.id > lastId) lastId = m.id;
   if (seen.has(m.id)) return;
   seen.add(m.id);
   const d = document.createElement("div");
@@ -80,6 +86,7 @@ $("proceed").onclick = async () => {
   db.channel("c-" + sid)
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: "session_id=eq." + sid }, p => add(p.new))
     .subscribe();
+  setInterval(poll, 3000);
 };
 
 $("f").onsubmit = async e => {
